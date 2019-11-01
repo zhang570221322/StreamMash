@@ -9,7 +9,9 @@ from collections import Counter
 import sys
 import time
 import logging
-
+import time
+import inspect
+import ctypes
 
 # 以下数据重置任务后需要重新清空
 # start
@@ -38,12 +40,35 @@ topn = 3
 buffer_size = 10485760
 
 
+def _async_raise(tid, exctype):
+    """raises the exception, performs cleanup if needed"""
+    tid = ctypes.c_long(tid)
+    if not inspect.isclass(exctype):
+        exctype = type(exctype)
+    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
+        tid, ctypes.py_object(exctype))
+    if res == 0:
+        raise ValueError("invalid thread id")
+    elif res != 1:
+        # """if it returns a number greater than one, you're in trouble,
+        # and you should call it again with exc=NULL to revert the effect"""
+        ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
+        raise SystemError("PyThreadState_SetAsyncExc failed")
+
+
+def stop_thread(thread):
+    """
+    销毁线程
+    """
+    _async_raise(thread.ident, SystemExit)
+
+
 def getEnd_sign(_end_sign):
     """
     判断任务是否结束
     """
     for i in _end_sign:
-        if ~i:
+        if not i:
             return False
     return True
 
@@ -64,7 +89,7 @@ def receive_files(files):
 @sio.event
 def message(data):
     # 保存接收文件信息
-    print("test 接收到信息了{0}".format(data))
+    print("receive information {0}".format(data))
     global uuid, file_name, sign_boolean
     uuid = str(data["uuid"])
     file_name = str(data["file_name"])
@@ -95,10 +120,10 @@ def message(data):
 def destruction(*t):
     while True:
         time.sleep(20)
-        print(end_sign)
+
         if(getEnd_sign(end_sign)):
             for i in t:
-                i._Thread__stop()
+                stop_thread(i)
             return
 
 
@@ -108,7 +133,7 @@ def file_content(data):
     接收文件内容
     """
 
-    if(data is "end"):
+    if("end" in str(data)):
         end_sign[0] = True
         return
     # 因为服务器是多线程传输，像数据链路层一样，分包传输，最后在这边写入时多线程写入会造成数据丢失。因此先放入队列里
@@ -198,7 +223,7 @@ def handle_result():
     将每次的结果进行不同方式，不同权重积累计算,高级消费者
     """
     global result_dic
-    count = 1
+
     while True:
         if not q2.empty():
             # accumulative results
@@ -207,9 +232,9 @@ def handle_result():
             re = q2.get()
             result_dic = dict(Counter(result_dic)+Counter(re))
             # sys.stdout.writelines(result_dic)
-            for (key, value) in result_dic.items():
-                print("{:<30} : {:<8}".format(key, value))
-            count += 1
+            for ele in sorted(result_dic.items(), key=lambda d: d[1], reverse=True):
+                key, value = str(ele).split(",")
+                print("{:<130} : {:<3}".format(key, value))
             time.sleep(1)
         if(end_sign[1] and q2.empty):
             print("Accumulate Done")

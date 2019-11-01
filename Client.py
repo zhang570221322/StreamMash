@@ -8,10 +8,6 @@ from multiprocessing import Process, Lock
 from collections import Counter
 import sys
 import time
-import logging
-import time
-import inspect
-import ctypes
 
 # 以下数据重置任务后需要重新清空
 # start
@@ -38,29 +34,6 @@ REFDB = "ReferenceSeqData/RefSeqSketches.msh"
 # 取MASH结果的前N进行保留
 topn = 3
 buffer_size = 10485760
-
-
-def _async_raise(tid, exctype):
-    """raises the exception, performs cleanup if needed"""
-    tid = ctypes.c_long(tid)
-    if not inspect.isclass(exctype):
-        exctype = type(exctype)
-    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
-        tid, ctypes.py_object(exctype))
-    if res == 0:
-        raise ValueError("invalid thread id")
-    elif res != 1:
-        # """if it returns a number greater than one, you're in trouble,
-        # and you should call it again with exc=NULL to revert the effect"""
-        ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
-        raise SystemError("PyThreadState_SetAsyncExc failed")
-
-
-def stop_thread(thread):
-    """
-    销毁线程
-    """
-    _async_raise(thread.ident, SystemExit)
 
 
 def getEnd_sign(_end_sign):
@@ -110,21 +83,21 @@ def message(data):
         t3 = threading.Thread(
             target=handle_result, args=())
         t3.start()
-        t4 = threading.Thread(
-            target=destruction, args=(t1, t2, t3,))
-        t4.start()
+        # t4 = threading.Thread(
+        #     target=destruction, args=(t1, t2, t3,))
+        # t4.start()
     except BaseException:
         print("Error: unable to start thread")
 
 
-def destruction(*t):
-    while True:
-        time.sleep(20)
+# def destruction(*t):
+#     while True:
+#         time.sleep(20)
 
-        if(getEnd_sign(end_sign)):
-            for i in t:
-                stop_thread(i)
-            return
+#         if(getEnd_sign(end_sign)):
+#             for i in t:
+
+#             return
 
 
 @sio.on('file_content')

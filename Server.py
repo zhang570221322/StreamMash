@@ -30,7 +30,7 @@ def read_in_chunks(foo1, session_foo, chunk_size=transmission_n_size):
         session_foo["current_flie_line_cursor"] += 1
         # 如果到达文件末尾,且不满足N行发送条件的，将剩下的发送。
         if not line:
-            if ~(session_foo["current_flie_line_cursor"] % chunk_size == 0 and session_foo["current_flie_line_cursor"] >= chunk_size):
+            if not (session_foo["current_flie_line_cursor"] % chunk_size == 0 and session_foo["current_flie_line_cursor"] >= chunk_size):
                 yield send_content
                 break
         # 满足N行才传送
